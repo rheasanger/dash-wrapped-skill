@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Dash Wrapped</title>
+<style>
+:root{--red:#eb1700;--cream:#fff4e6;--ink:#11100f;--aqua:#8cf0de;--pink:#ff91dc;--yellow:#f8ff73}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;overflow:hidden;background:#000;color:var(--cream);
+  font-family:"Avenir Next","Helvetica Neue",Arial,sans-serif;font-weight:800}
+body{isolation:isolate}
+body:before{content:"";position:fixed;z-index:-1;width:520px;height:350px;left:-310px;top:9vh;
+  border:24px solid var(--aqua);border-radius:48% 52% 38% 62%;transform:rotate(-22deg);
+  box-shadow:0 0 0 18px var(--red),0 0 0 36px var(--yellow)}
+body:after{content:"";position:fixed;z-index:-1;width:86px;height:86px;right:3vw;bottom:4vh;
+  background:var(--pink);box-shadow:-86px 0 var(--aqua),-86px -86px var(--aqua),
+  -172px 0 var(--yellow),-172px -86px var(--yellow),-172px -172px var(--red);transform:rotate(-8deg)}
+button{font:inherit;color:inherit;-webkit-tap-highlight-color:transparent}
+.app{position:relative;z-index:1;height:100svh;display:grid;grid-template-rows:minmax(0,1fr) auto;gap:12px;
+  padding:max(22px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right))
+  max(14px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left))}
+main{min-height:0;display:grid;place-items:center}
+.stage{position:relative;height:100%;max-height:calc(100svh - 116px);aspect-ratio:9/16;max-width:calc(100vw - 140px)}
+.frame{width:100%;height:100%;overflow:hidden;border:2px solid #383431;border-radius:clamp(18px,3vh,30px);background:var(--ink)}
+.track{height:100%;display:flex;transition:transform .42s cubic-bezier(.22,.8,.2,1);will-change:transform}
+.slide{position:relative;min-width:100%;height:100%;overflow:hidden;background:var(--ink)}
+.slide img,.slide video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.progress{position:absolute;z-index:5;top:-15px;left:0;right:0;display:grid;gap:6px}
+.progress span{height:5px;overflow:hidden;border-radius:99px;background:#fff4e64d}
+.progress i{display:block;width:0;height:100%;background:var(--cream)}
+.control{display:grid;place-items:center;position:absolute;z-index:6;width:46px;height:46px;padding:0;
+  border:1px solid #625c57;border-radius:50%;background:#11100ee8}
+.control svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.prev,.next{top:50%;transform:translateY(-50%)}.prev{left:-59px}.next{right:-59px}
+.playback{left:14px;bottom:14px}.actions{position:absolute;z-index:6;right:14px;bottom:14px;display:flex;gap:8px}
+.actions .control{position:static}.share-card[hidden]{display:none}
+footer{display:grid;place-items:center;min-height:52px}
+.share-video{min-height:48px;padding:0 26px;border:2px solid var(--cream);border-radius:999px;background:var(--cream);color:var(--ink)}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+button:focus-visible{outline:3px solid #8cf0de;outline-offset:3px}
+@media(max-width:600px){.stage{width:100%;height:auto;max-width:min(100%,calc((100svh - 112px)*9/16))}.prev,.next{display:none}}
+@media(hover:hover) and (pointer:fine){button:hover{background:var(--red);color:var(--cream)}}
+@media(prefers-reduced-motion:reduce){.track{transition:none}.slide video{display:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <main><section class="stage" id="stage" aria-roledescription="carousel">
+    <div class="progress" id="progress" role="progressbar" aria-valuemin="0"></div>
+    <div class="frame"><div class="track" id="track"></div></div>
+    <button class="control prev" id="prev" aria-label="Previous card"><svg viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></svg></button>
+    <button class="control next" id="next" aria-label="Next card"><svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg></button>
+    <button class="control playback" id="playback" aria-label="Pause slideshow" aria-pressed="false"></button>
+    <div class="actions">
+      <button class="control" id="saveCard" aria-label="Save card" title="Save card"><svg viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M5 19h14"/></svg></button>
+      <button class="control share-card" id="shareCard" aria-label="Share card" title="Share card"><svg viewBox="0 0 24 24"><path d="M12 16V3m-4 4 4-4 4 4M5 12v8h14v-8"/></svg></button>
+    </div>
+  </section></main>
+  <footer><button class="share-video" id="shareVideo">Share video</button></footer>
+</div>
+<div id="status" class="sr-only" aria-live="polite"></div>
+<script id="wrapped-data" type="application/json">__WRAPPED_DATA_JSON__</script>
+<script>
+const data=JSON.parse(document.getElementById("wrapped-data").textContent);
+const cards=data.cards, DURATION=5000, reduced=matchMedia("(prefers-reduced-motion: reduce)").matches;
+const track=document.getElementById("track"), progress=document.getElementById("progress");
+const stage=document.getElementById("stage"), playback=document.getElementById("playback");
+const shareCard=document.getElementById("shareCard"), status=document.getElementById("status");
+let index=0,playing=true,elapsed=0,last=performance.now(),raf=0,startX=null;
+const slug=String(data.slug||"doordash").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")||"doordash";
+const icons={
+  pause:'<svg viewBox="0 0 24 24"><path d="M9 6v12M15 6v12"/></svg>',
+  play:'<svg viewBox="0 0 24 24"><path d="m9 6 9 6-9 6Z"/></svg>'
+};
+
+cards.forEach(function(card,i){
+  const slide=document.createElement("article"); slide.className="slide"; slide.dataset.index=i;
+  slide.innerHTML='<img src="'+card.poster+'" alt="'+escapeHTML(card.alt||("Dash Wrapped card "+(i+1)))+'">'+
+    (card.clip?'<video src="'+card.clip+'" muted playsinline preload="metadata"></video>':'');
+  track.appendChild(slide);
+  const segment=document.createElement("span"); segment.innerHTML="<i></i>"; progress.appendChild(segment);
+});
+progress.style.gridTemplateColumns="repeat("+cards.length+",1fr)";
+progress.setAttribute("aria-valuemax",String(cards.length));
+
+function escapeHTML(s){return String(s).replace(/[&<>"']/g,function(c){return({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]})}
+function setIcon(){playback.innerHTML=playing?icons.pause:icons.play;playback.setAttribute("aria-label",playing?"Pause slideshow":"Play slideshow");playback.setAttribute("aria-pressed",String(!playing))}
+function paint(){
+  track.style.transform="translate3d(-"+(index*100)+"%,0,0)";
+  [...progress.children].forEach(function(s,i){s.firstChild.style.width=(i<index?100:i>index?0:Math.min(100,elapsed/DURATION*100))+"%"});
+  progress.setAttribute("aria-valuenow",String(index+1)); status.textContent="Card "+(index+1)+" of "+cards.length;
+}
+function replay(){
+  document.querySelectorAll(".slide video").forEach(function(v){v.pause();try{v.currentTime=0}catch(e){}});
+  const v=track.children[index].querySelector("video"); if(v&&!reduced)v.play().catch(function(){});
+}
+function go(next,manual){
+  if(manual)setPlaying(false);
+  index=Math.max(0,Math.min(cards.length-1,next)); elapsed=0; paint(); replay();
+}
+function setPlaying(value){
+  cancelAnimationFrame(raf);
+  if(value&&index===cards.length-1&&elapsed>=DURATION){index=0;elapsed=0;paint();replay()}
+  playing=value; last=performance.now(); setIcon();
+  if(playing)raf=requestAnimationFrame(tick);
+}
+function tick(now){
+  elapsed+=now-last; last=now;
+  if(elapsed>=DURATION){
+    if(index<cards.length-1){index++;elapsed=0;paint();replay()}
+    else{elapsed=DURATION;paint();setPlaying(false);return}
+  }else paint();
+  raf=requestAnimationFrame(tick);
+}
+playback.onclick=function(){setPlaying(!playing)};
+document.getElementById("prev").onclick=function(){go(index-1,true)};
+document.getElementById("next").onclick=function(){go(index+1,true)};
+stage.addEventListener("pointerdown",function(e){startX=e.clientX});
+stage.addEventListener("pointerup",function(e){if(startX===null)return;const dx=e.clientX-startX;startX=null;if(Math.abs(dx)>45)go(index+(dx<0?1:-1),true)});
+addEventListener("keydown",function(e){if(e.key==="ArrowRight")go(index+1,true);if(e.key==="ArrowLeft")go(index-1,true);if(e.key==="Home")go(0,true);if(e.key==="End")go(cards.length-1,true)});
+
+function dataURLBlob(url){const p=url.split(","),bytes=atob(p[1]),out=new Uint8Array(bytes.length);for(let i=0;i<bytes.length;i++)out[i]=bytes.charCodeAt(i);return new Blob([out],{type:(p[0].match(/data:([^;]+)/)||[])[1]||"image/png"})}
+function b64Blob(b64,type){const parts=[],size=524288;for(let i=0;i<b64.length;i+=size){const bytes=atob(b64.slice(i,i+size)),out=new Uint8Array(bytes.length);for(let j=0;j<bytes.length;j++)out[j]=bytes.charCodeAt(j);parts.push(out)}return new Blob(parts,{type:type})}
+function download(blob,name){const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},1000)}
+function cardFile(){return new File([dataURLBlob(cards[index].poster)],slug+"-dash-wrapped-"+String(index+1).padStart(2,"0")+".png",{type:"image/png"})}
+document.getElementById("saveCard").onclick=function(){const f=cardFile();download(f,f.name)};
+const canShareFiles=!!(navigator.share&&navigator.canShare&&navigator.canShare({files:[new File(["x"],"x.png",{type:"image/png"})]}));
+shareCard.hidden=!canShareFiles;
+shareCard.onclick=async function(){const f=cardFile();try{await navigator.share({files:[f]})}catch(e){if(e.name!=="AbortError")download(f,f.name)}};
+document.getElementById("shareVideo").onclick=async function(){
+  const button=this;button.disabled=true;button.textContent="Preparing…";
+  const blob=b64Blob(data.videoBase64,"video/mp4"),file=new File([blob],slug+"-dash-wrapped-video.mp4",{type:"video/mp4"});
+  try{if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]}))await navigator.share({files:[file]});else download(file,file.name)}
+  catch(e){if(e.name!=="AbortError")download(file,file.name)}
+  finally{button.disabled=false;button.textContent="Share video"}
+};
+setIcon();paint();replay();raf=requestAnimationFrame(tick);
+</script>
+</body>
+</html>

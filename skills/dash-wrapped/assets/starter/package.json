@@ -1,0 +1,24 @@
+{
+  "name": "dash-wrapped-run",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "preflight": "node scripts/preflight.mjs",
+    "fetch": "node scripts/preflight.mjs && node scripts/fetch.mjs",
+    "analyze": "node scripts/analyze.mjs",
+    "draft": "node scripts/draft-story.mjs",
+    "data": "node scripts/preflight.mjs && node scripts/fetch.mjs && node scripts/analyze.mjs && node scripts/draft-story.mjs",
+    "render": "node scripts/render.mjs",
+    "build:html": "node scripts/build-html.mjs",
+    "qa": "node scripts/qa.mjs",
+    "finish": "node scripts/render.mjs && node scripts/build-html.mjs && node scripts/qa.mjs"
+  },
+  "dependencies": {
+    "@remotion/bundler": "4.0.496",
+    "@remotion/cli": "4.0.496",
+    "@remotion/renderer": "4.0.496",
+    "react": "19.1.1",
+    "react-dom": "19.1.1",
+    "remotion": "4.0.496"
+  }
+}

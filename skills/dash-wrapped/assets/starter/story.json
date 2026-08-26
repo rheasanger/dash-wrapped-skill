@@ -1,0 +1,22 @@
+{
+  "slug": "",
+  "cover": {
+    "alt": "",
+    "name": "YOUR",
+    "stats": [
+      {"value": "—", "label": "STAT 1"},
+      {"value": "—", "label": "STAT 2"},
+      {"value": "—", "label": "STAT 3"},
+      {"value": "—", "label": "STAT 4"}
+    ],
+    "teaser": ""
+  },
+  "cards": [],
+  "finale": {
+    "alt": "",
+    "headline": "",
+    "footer": "",
+    "meals": [],
+    "restaurants": []
+  }
+}
